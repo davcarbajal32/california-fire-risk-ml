@@ -1,4 +1,4 @@
-# California-Fire-Risk-Predictor
+# California Wildfire Risk Predictor: Cost-Sensitive Anomaly Detection
 
 Abstract
 This project focuses on developing a Fire Risk Predictor, a machine learning model designed for predicting the likelihood of a wildfire based on features that include time of the year, temperature, wind speeds, and numerous more. The purpose of this model is to proactively assess / predict fire danger levels. Having this ability can lead to better improved resource allocation, and stronger levels of preparation to reduce the social, economical, and environmental impact of these fires. This project uses a large dataset of historical wildfires that have occurred in California, and will utilize / apply data preprocessing techniques, exploratory data analysis, and predictive modeling techniques that will identify patterns and hidden information from the dataset that influence the potential fire risk. 
@@ -6,7 +6,6 @@ This project focuses on developing a Fire Risk Predictor, a machine learning mod
 Introduction
 The goal of this project is to build a machine learning model that accurately identifies the likelihood of a wildfire on any given day in California. Wildfire instances have become increasingly more frequent in the state as time has passed, with some having extremely devastating social, economic, and environmental impacts. These risks highlight the need for proactive, data driven strategies that would assist in minimizing these potential impacts. Our motivation is to design a predictive system that can assist locations and have them better prepared. To do this our plan is to leverage historical wildfire data to better understand the conditions that have strong relationships to wildfire ignition.  
 
-# California Wildfire Risk Predictor: Cost-Sensitive Anomaly Detection
 ## Project Overview
 
 This project implements a **high-recall binary classification model** to predict the daily risk of a wildfire starting in California.
