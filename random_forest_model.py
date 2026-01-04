@@ -1,0 +1,173 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import csv
+import math
+import seaborn as sns
+
+from sklearn.metrics import average_precision_score, classification_report
+from sklearn.utils.class_weight import compute_class_weight
+from sklearn.ensemble import RandomForestClassifier
+
+FEATURE_VALUES = [
+     #removed'precipitation', (less than .025 importance)
+    'max_temp',
+    'min_temp',
+    'avg_wind_speed',
+    'year',
+    'temp_range',
+    'wind_temp_ratio',
+    'month',
+     #removed 'lagged_precipitation', (less than .025 importance)
+    'lagged_avg_wind_speed',
+    'season',
+    'temp_3day_avg',
+    'wind_3day_avg',
+    'precip_7day_sum',
+     #removed 'dry_days_7', (less than .025 importance)
+    'temp_wind',
+
+]
+
+# one hot encoding for seasons
+SEASON_ORDER = ['summer', 'fall', 'winter', 'spring']
+
+TARGET_NAME = 'fire_start_day'
+
+X = []  # FEATURE MATRIX
+Y = []  # TARGET VECTOR
+column_indices = {}  # DICTIONARY STORING COLUMN NAME AND ITS INDEX
+
+# Read in CSV file
+with open('CA_Weather_Fire_Dataset_1984-2025_new.csv', 'r') as csvfile:
+    reader = csv.reader(csvfile)
+
+    # Maps columns to their index
+    header = next(reader)[1:]
+    for i, col_name in enumerate(header):
+        column_indices[col_name.lower()] = i
+
+    season_index = column_indices['season']
+    target_index = column_indices[TARGET_NAME]
+
+    # Iterate through each row of the dataset
+    for row in reader:
+        data_slice = row[1:]
+
+        if not data_slice:
+            continue
+
+        feature_vector = []
+
+        # Processes whole row, skips row if any error occurs
+        try:
+            for name in FEATURE_VALUES:
+                idx = column_indices.get(name)
+                if idx is None:
+                  raise KeyError(f"Column '{name}' not found in CSV header")
+
+                # One hot encoding for the 'season' features
+                if idx == season_index:
+                    current_season = data_slice[idx].lower()
+                    for category in SEASON_ORDER:
+                        is_match = 1 if current_season == category else 0
+                        feature_vector.append(is_match)
+                    continue
+
+                # Process numerical features
+                value = data_slice[idx].strip()
+
+                # Check if missing value in columns
+                if value == '':
+                    raise ValueError("Empty string found")
+
+                feature_vector.append(round(float(value), 5))
+
+            target_value = data_slice[target_index].lower()
+
+            # Append processed row to lists
+            X.append(feature_vector)
+            Y.append(1 if target_value == 'true' else 0)
+        except (ValueError, IndexError) as e:
+            pass
+
+# creating feature names list for DataFrame columns (making 4 season columns, 1 for each season)
+feature_names = []
+for name in FEATURE_VALUES:
+    if name == 'season':
+        for s in SEASON_ORDER:
+            feature_names.append(f'season_{s}')
+    else:
+        feature_names.append(name)
+
+# converting X and Y to numpy arrays
+X = np.array(X)
+Y = np.array(Y)
+
+# creating the DataFrame
+df = pd.DataFrame(X, columns=feature_names)
+df[TARGET_NAME] = Y
+
+# IMPORTANT: sort by year and reassign so rows are chronological
+df = df.sort_values(by='year').reset_index(drop=True)
+
+# Rebuild X and Y in chronological order
+X = df[feature_names].values
+Y = df[TARGET_NAME].values
+
+# correlation matrix (optional)
+correlation_matrix = df.corr(numeric_only=True)
+
+# Count classes
+no = np.sum(Y == 0)
+yes = np.sum(Y == 1)
+print("Number of instances with fire_start_day = 0 (No) and 1 = (Yes)")
+print("No: ", no)
+print("Yes: ", yes)
+
+# Compute class weights
+class_weights = compute_class_weight(
+    class_weight='balanced',
+    classes=np.array([0, 1]),
+    y=Y
+)
+
+no_Weight, yes_Weight = class_weights
+print("Class weights:")
+print(f"Weight for No: {no_Weight:0.4f}")
+print(f"Weight for Yes: {yes_Weight:0.4f}")
+
+# Chronological split: first 90% of time → training, last 10% → testing
+split = int(len(X) * 0.9)
+
+X_train = X[:split]
+Y_train = Y[:split]
+X_test = X[split:]
+Y_test = Y[split:]
+
+rf = RandomForestClassifier(
+    n_estimators=300,
+    random_state=42,
+    class_weight={0: no_Weight, 1: yes_Weight}
+)
+
+# fitting the model
+rf.fit(X_train, Y_train)
+
+# predicted probabilities for the "fire" class
+y_probability = rf.predict_proba(X_test)[:, 1]
+y_pred = rf.predict(X_test)
+
+print("Classification report:")
+print(classification_report(Y_test, y_pred, digits=4))
+
+# Top 5 features by importance
+importances = rf.feature_importances_
+imp_df = (
+    pd.DataFrame({"feature": feature_names, "importance": importances})
+      .sort_values("importance", ascending=False)
+      .reset_index(drop=True)
+)
+
+print("\nTop 5 features by importance:")
+print(imp_df.head(5).to_string(index=False))
